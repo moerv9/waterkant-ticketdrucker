@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Printer Connection Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Brother Printer Connection Manager</h1>
+    
+    <div class="card">
+        <h2>Connection Status</h2>
+        <div id="connection-status" class="connection-status disconnected">
+            Not connected
+        </div>
+        <div>
+            <strong>Connection Method:</strong> <span id="connection-method">None</span>
+        </div>
+        <div>
+            <strong>Printer Address:</strong> <span id="connection-address">None</span>
+        </div>
+        <div>
+            <strong>Printer Model:</strong> <span id="printer-model">QL-820NWB</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Connect to Printer</h2>
+        <button id="scan-system">Select System Printer</button>
+        
+        <div id="device-container" style="display: none;">
+            <h3>Available System Printers</h3>
+            <div id="device-list" class="device-list"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Test Print</h2>
+        <div class="test-print-form">
+            <input type="text" id="first-name" placeholder="First Name">
+            <input type="text" id="last-name" placeholder="Last Name">
+            <button id="print-test">Print Name Tag</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
