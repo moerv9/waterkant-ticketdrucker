@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -28,6 +28,13 @@
             padding: 8px;
             font-size: 16px;
         }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row .form-group {
+            flex: 1;
+        }
         button {
             background-color: #4CAF50;
             color: white;
@@ -35,6 +42,14 @@
             cursor: pointer;
             padding: 10px 15px;
             margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         .preview {
             margin-top: 20px;
@@ -46,8 +61,10 @@
             margin-top: 10px;
             background-color: white;
             border: 1px solid #ccc;
-            padding: 5px;
-            display: inline-block;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #result {
             margin-top: 20px;
@@ -56,11 +73,48 @@
             border-radius: 4px;
             white-space: pre-wrap;
         }
+        .printer-status {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-radius: 5px;
+            border-left: 5px solid #27ae60;
+        }
+        .printer-status.disconnected {
+            background-color: #fdedec;
+            border-left-color: #e74c3c;
+        }
+        .help-text {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 2px;
+        }
+        .presets {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e8f4f8;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <h1>Simple Label Printer</h1>
     
+    <!-- Printer Status -->
+    <div id="printerStatus" class="printer-status disconnected">
+        <h3>Printer Status: <span id="statusText">Checking...</span></h3>
+        <div id="printerInfo"></div>
+    </div>
+    
+    <!-- Presets -->
+    <div class="presets">
+        <h3>Quick Presets</h3>
+        <button onclick="applyPreset('standard')">Standard Label (731×300, Font 300)</button>
+        <button onclick="applyPreset('large')">Large Text (731×300, Font 500)</button>
+        <button onclick="applyPreset('small')">Small Label (731×150, Font 200)</button>
+    </div>
+    
+    <h2>Label Content</h2>
     <div class="form-group">
         <label for="firstName">First Name:</label>
         <input type="text" id="firstName" value="Test">
@@ -79,17 +133,34 @@
         </select>
     </div>
     
-    <div class="form-group">
-        <label for="maxFontSize">Maximum Font Size:</label>
-        <input type="number" id="maxFontSize" value="100">
+    <h2>Label Settings</h2>
+    <div class="row">
+        <div class="form-group">
+            <label for="width">Width (pixels):</label>
+            <input type="number" id="width" value="731">
+            <div class="help-text">Default: 731px (62mm at 300dpi)</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="height">Height (pixels):</label>
+            <input type="number" id="height" value="300">
+            <div class="help-text">Try 300-500px for good results</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="fontSize">Font Size:</label>
+            <input type="number" id="fontSize" value="300">
+            <div class="help-text">Try 200-500 for best results</div>
+        </div>
     </div>
     
-    <button onclick="printLabel()">Print Label</button>
-    <button onclick="showPreview()">Preview</button>
+    <button id="printBtn" onclick="printLabel()">Print Label</button>
+    <button onclick="showPreview()" class="secondary">Preview</button>
     
     <div class="preview" id="preview" style="display: none;">
         <h3>Preview:</h3>
         <div id="previewLabel"></div>
+        <p><em>Note: This is a rough preview. The actual label will be proportional to your settings.</em></p>
     </div>
     
     <div id="result" style="display: none;"></div>
@@ -98,29 +169,108 @@
         // Base URL for API
         const apiUrl = 'http://localhost:5555';
         
+        // Check printer status on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkPrinterStatus();
+        });
+        
+        // Check printer status
+        async function checkPrinterStatus() {
+            try {
+                const response = await fetch(`${apiUrl}/api/printer/status`);
+                const result = await response.json();
+                
+                updatePrinterStatus(result);
+                
+            } catch (error) {
+                document.getElementById('statusText').textContent = 'Error checking printer status';
+            }
+        }
+        
+        // Update printer status display
+        function updatePrinterStatus(status) {
+            const statusElement = document.getElementById('printerStatus');
+            const statusTextElement = document.getElementById('statusText');
+            const printerInfoElement = document.getElementById('printerInfo');
+            
+            if (status.connected) {
+                statusElement.classList.remove('disconnected');
+                statusTextElement.textContent = 'Connected';
+                printerInfoElement.innerHTML = `
+                    <p><strong>Printer:</strong> ${status.address}</p>
+                    <p><strong>Connection:</strong> ${status.method}</p>
+                    <p><strong>Model:</strong> ${status.model}</p>
+                `;
+                document.getElementById('printBtn').disabled = false;
+            } else {
+                statusElement.classList.add('disconnected');
+                statusTextElement.textContent = 'Not Connected';
+                printerInfoElement.innerHTML = `
+                    <p>${status.status}</p>
+                    <p>Please connect a printer in the printer management interface.</p>
+                `;
+                document.getElementById('printBtn').disabled = true;
+            }
+        }
+        
+        // Apply preset settings
+        function applyPreset(preset) {
+            switch(preset) {
+                case 'standard':
+                    document.getElementById('width').value = 731;
+                    document.getElementById('height').value = 300;
+                    document.getElementById('fontSize').value = 300;
+                    break;
+                case 'large':
+                    document.getElementById('width').value = 731;
+                    document.getElementById('height').value = 300;
+                    document.getElementById('fontSize').value = 500;
+                    break;
+                case 'small':
+                    document.getElementById('width').value = 731;
+                    document.getElementById('height').value = 150;
+                    document.getElementById('fontSize').value = 200;
+                    break;
+            }
+            
+            // Show preview with new settings
+            showPreview();
+        }
+        
         // Show a preview
         function showPreview() {
             const firstName = document.getElementById('firstName').value;
             const lastName = document.getElementById('lastName').value;
             const layout = document.getElementById('layout').value;
+            const width = parseInt(document.getElementById('width').value) || 731;
+            const height = parseInt(document.getElementById('height').value) || 300;
+            const fontSize = parseInt(document.getElementById('fontSize').value) || 300;
             
             const preview = document.getElementById('preview');
             const previewLabel = document.getElementById('previewLabel');
             
-            // Set dimensions based on actual label size (62mm x 10mm)
-            const labelWidth = 310; // Scaled down for display
-            const labelHeight = 50;  // Scaled down for display
-            
-            previewLabel.style.width = labelWidth + 'px';
-            previewLabel.style.height = labelHeight + 'px';
+            // Set preview dimensions (scaled down for display)
+            const scale = 0.5;
+            previewLabel.style.width = (width * scale) + 'px';
+            previewLabel.style.height = (height * scale) + 'px';
             
             // Create preview content based on layout
             if (layout === 'side_by_side') {
-                previewLabel.innerHTML = `<div style="font-family: Arial; font-weight: bold; font-size: 24px; text-align: center;">${firstName} ${lastName}</div>`;
+                previewLabel.innerHTML = `
+                    <div style="font-family: Arial; font-weight: bold; font-size: ${fontSize * scale / 2}px; text-align: center;">
+                        ${firstName} ${lastName}
+                    </div>
+                `;
             } else {
                 previewLabel.innerHTML = `
-                    <div style="font-family: Arial; font-weight: bold; font-size: 20px; text-align: center;">${firstName}</div>
-                    <div style="font-family: Arial; font-weight: bold; font-size: 16px; text-align: center;">${lastName}</div>
+                    <div style="width: 100%; text-align: center;">
+                        <div style="font-family: Arial; font-weight: bold; font-size: ${fontSize * scale / 2}px;">
+                            ${firstName}
+                        </div>
+                        <div style="font-family: Arial; font-weight: bold; font-size: ${fontSize * scale * 0.4 / 2}px; margin-top: ${fontSize * scale / 20}px;">
+                            ${lastName}
+                        </div>
+                    </div>
                 `;
             }
             
@@ -136,19 +286,26 @@
                 const firstName = document.getElementById('firstName').value;
                 const lastName = document.getElementById('lastName').value;
                 const layout = document.getElementById('layout').value;
-                const maxFontSize = parseInt(document.getElementById('maxFontSize').value) || 100;
+                const width = parseInt(document.getElementById('width').value) || 731;
+                const height = parseInt(document.getElementById('height').value) || 300;
+                const fontSize = parseInt(document.getElementById('fontSize').value) || 300;
                 
                 // Prepare request data
                 const data = {
                     first_name: firstName,
                     last_name: lastName,
                     layout: layout,
-                    max_font_size: maxFontSize,
-                    // Use defaults for width and height (731x118 for 62mm x 10mm at 300dpi)
+                    font_size: fontSize,
+                    width: width,
+                    height: height
                 };
                 
+                // Disable the print button
+                document.getElementById('printBtn').disabled = true;
+                document.getElementById('printBtn').textContent = 'Printing...';
+                
                 // Call the API
-                const response = await fetch(`${apiUrl}/print-label`, {
+                const response = await fetch(`${apiUrl}/print-simple`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -165,9 +322,17 @@
                 // Show preview
                 showPreview();
                 
+                // Re-enable the print button
+                document.getElementById('printBtn').disabled = false;
+                document.getElementById('printBtn').textContent = 'Print Label';
+                
             } catch (error) {
                 resultDiv.textContent = `Error: ${error.message}`;
                 resultDiv.style.display = 'block';
+                
+                // Re-enable the print button
+                document.getElementById('printBtn').disabled = false;
+                document.getElementById('printBtn').textContent = 'Print Label';
             }
         }
     </script>
