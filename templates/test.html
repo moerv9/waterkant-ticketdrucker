@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name Tag Printer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, button {
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .preview {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+        }
+        .preview-image {
+            margin-top: 10px;
+            max-width: 100%;
+            border: 1px dashed #999;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Name Tag Printer Testing Interface</h1>
+    
+    <div class="form-group">
+        <label for="firstName">First Name:</label>
+        <input type="text" id="firstName" value="Test">
+    </div>
+    
+    <div class="form-group">
+        <label for="lastName">Last Name:</label>
+        <input type="text" id="lastName" value="123">
+    </div>
+    
+    <h3>Advanced Settings</h3>
+    
+    <div class="form-group">
+        <label for="width">Image Width (px):</label>
+        <input type="number" id="width" value="696">
+    </div>
+    
+    <div class="form-group">
+        <label for="height">Image Height (px):</label>
+        <input type="number" id="height" value="271">
+    </div>
+    
+    <div class="form-group">
+        <label for="firstFontSize">First Name Font Size (leave blank for auto):</label>
+        <input type="number" id="firstFontSize" placeholder="Auto">
+    </div>
+    
+    <div class="form-group">
+        <label for="lastFontSize">Last Name Font Size (leave blank for auto):</label>
+        <input type="number" id="lastFontSize" placeholder="Auto">
+    </div>
+    
+    <div class="form-group">
+        <label for="verticalSpacing">Vertical Spacing (px):</label>
+        <input type="number" id="verticalSpacing" value="10">
+    </div>
+    
+    <button onclick="printNameTag()">Print Name Tag</button>
+    <button onclick="previewOnly()">Preview Only (No Print)</button>
+    
+    <div class="preview" id="preview" style="display: none;">
+        <h3>Preview:</h3>
+        <div id="previewContent"></div>
+        <img id="previewImage" class="preview-image">
+    </div>
+    
+    <div class="response" id="response" style="display: none;"></div>
+    
+    <script>
+        // Base URL for API
+        const apiUrl = 'http://localhost:5555';
+        
+        // Preview the name tag without printing
+        async function previewOnly() {
+            const preview = document.getElementById('preview');
+            const previewContent = document.getElementById('previewContent');
+            const previewImage = document.getElementById('previewImage');
+            
+            // Get form values
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            
+            // Set preview content
+            previewContent.innerHTML = `
+                <p><strong>First Name:</strong> ${firstName}</p>
+                <p><strong>Last Name:</strong> ${lastName}</p>
+                <p>This is a simulation only. The actual printed tag may appear different.</p>
+            `;
+            
+            // Show the preview
+            preview.style.display = 'block';
+            
+            // Simulate image (in a real app, you might generate a preview image)
+            previewImage.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="696" height="271" style="background:white;"><text x="50%" y="40%" text-anchor="middle" font-family="Arial" font-size="48" font-weight="bold">${firstName}</text><text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="48" font-weight="bold">${lastName}</text></svg>`;
+        }
+        
+        // Print the name tag
+        async function printNameTag() {
+            const responseDiv = document.getElementById('response');
+            
+            try {
+                // Get form values
+                const firstName = document.getElementById('firstName').value;
+                const lastName = document.getElementById('lastName').value;
+                const width = parseInt(document.getElementById('width').value) || 696;
+                const height = parseInt(document.getElementById('height').value) || 271;
+                const firstFontSize = document.getElementById('firstFontSize').value 
+                    ? parseInt(document.getElementById('firstFontSize').value) 
+                    : null;
+                const lastFontSize = document.getElementById('lastFontSize').value 
+                    ? parseInt(document.getElementById('lastFontSize').value) 
+                    : null;
+                const verticalSpacing = parseInt(document.getElementById('verticalSpacing').value) || 10;
+                
+                // Prepare request data
+                const data = {
+                    attendee_firstname: firstName,
+                    attendee_lastname: lastName,
+                    width: width,
+                    height: height,
+                    vertical_spacing: verticalSpacing
+                };
+                
+                // Add optional parameters only if they have values
+                if (firstFontSize) data.first_font_size = firstFontSize;
+                if (lastFontSize) data.last_font_size = lastFontSize;
+                
+                // Send API request
+                const response = await fetch(`${apiUrl}/print-name`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                // Parse response
+                const result = await response.json();
+                
+                // Show response
+                responseDiv.textContent = JSON.stringify(result, null, 2);
+                responseDiv.style.display = 'block';
+                
+                // Also show preview
+                previewOnly();
+                
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+                responseDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

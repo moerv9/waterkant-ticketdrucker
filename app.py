@@ -6,7 +6,7 @@ import time
 from threading import Thread
 from PIL import Image, ImageDraw, ImageFont
 import re
-
+import subprocess
 # Import our printer management modules
 from printer_manager.scanner import get_system_printers
 from printer_manager.connection import test_printer_connection, update_print_module
@@ -17,9 +17,6 @@ app = Flask(__name__)
 CORS(app)
 
 # Create necessary directories
-os.makedirs("static/css", exist_ok=True)
-os.makedirs("static/js", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
 os.makedirs("img", exist_ok=True)
 
 # Global printer connection state - persistent across app restarts
@@ -34,7 +31,7 @@ default_printer_state = {
     "status": "Not connected",
     "last_attempt": None
 }
-
+PRINTER_ADDRESS = "Brother_QL_820NWB__94ddf8a529c6_"
 # Load printer state from file or use default
 def load_printer_state():
     try:
@@ -129,136 +126,111 @@ def handle_connect():
     
     return jsonify(printer_state)
 
-# Route for serving the main HTML page
+def print_label(path):
+    """Function to print an image using brother_ql."""
+    try:
+        print(f"Printing image {path} with brother_ql")
+        # Use brother_ql with proper settings
+        os.system(f"brother_ql print -l 62 --dpi 300 --rotate 0 {path}")
+        print("Print command executed.")
+        
+        # Optional: only remove the file if successful printing is confirmed
+        os.remove(path)
+        return True
+    except Exception as e:
+        print(f"Exception during printing: {e}")
+        return False
+
+
+# --- Static print function ---
+def print_name(path):
+    """Static function to print an image using the system printer."""
+    try:
+        print(f"Printing image {path} to printer {PRINTER_ADDRESS}")
+        # Simple printing command (you can adjust options as needed)
+        cmd = ["lp", "-d", PRINTER_ADDRESS, path]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("Print successful.")
+            return True
+        else:
+            print(f"Print failed: {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"Exception during printing: {e}")
+        return False
+
+# --- Simplified image creation function ---
+def create_image_with_name(first_name, last_name, width=696, height=271):
+    # Create a white background image
+    image = Image.new("RGB", (width, height), "white")
+    
+    # Initialize the drawing context
+    draw = ImageDraw.Draw(image)
+    
+    font_size = 128
+
+    if len(first_name) >= 8 or len(last_name) >= 8:
+        longest_name = first_name if len(first_name) > len(last_name) else last_name
+        oversize = len(longest_name) - 8
+        font_size = 128 - 12.32381 * oversize + 0.552381 * oversize ** 2
+        print(f"Adjusted font size to: {font_size}")
+
+    # Load the font – adjust the font path if necessary
+    font = ImageFont.truetype(font='./font/Dia-Black.ttf', size=int(font_size))
+    
+    # Center the text (here we simply use the whole image dimensions)
+    text_width, text_height = width, height
+    text_x = (width - text_width) / 2
+    text_y = (height - text_height) / 2
+    
+    # Draw first name on the top half and last name on the bottom half
+    draw.text((text_x, 0), first_name, fill="black", font=font)
+    draw.text((text_x, text_height / 2), last_name, fill="black", font=font)
+    
+    # Create a file path (remove whitespace)
+    path = re.sub(r'\s+', '', f"./img/{first_name}{last_name}.png")
+    
+    # Save the image
+    image.save(path)
+    
+    # Print the image using our static print function
+    print_name(path)
+    
+    return path
+
+# --- Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Import the original create_image_with_name function and modify print_name to use our dynamic module
+@app.route ("/test")
+def test():
+    return render_template('test.html')
+
 @app.route('/print-name', methods=['POST'])
 def handle_print_name():
     try:
-        # Check for Name in Request Body
         data = request.get_json()
         if 'attendee_firstname' not in data or 'attendee_lastname' not in data:
-            # return error if the first and last name is missing
             return jsonify({"error": "Missing first or last name in request body"}), 400
-        
-        # Check if printer is connected
-        if not printer_state["connected"]:
-            return jsonify({"error": "No printer connected. Please connect a system printer first."}), 400
-            
+
         first_name = data['attendee_firstname']
         last_name = data['attendee_lastname']
+
+        # Create the image with the name (this also calls print_name)
+        image_path = create_image_with_name(first_name, last_name)
         
-        # Reload the print module to get any updates
-        importlib.reload(print_module)
-        
-        # Create the image - use landscape orientation for the label printer
-        # Brother QL printers typically use 62mm width labels
-        # For 62mm label, we'll use a width of 696 pixels (at 300dpi)
-        # Height will depend on the label length, but 271 is typical for a name tag
-        
-        # For Brother QL printers, the "width" is actually the height in portrait orientation
-        # and "height" is the width when we print in landscape. It's confusing but that's how it works.
-        height = 696  # This is actually the width when we print in landscape
-        width = 271   # This is actually the height when we print in landscape
-        
-        image = Image.new("RGB", (width, height), "white")
-        
-        # Initialize the drawing context
-        draw = ImageDraw.Draw(image)
-        
-        font_size = 128
-        
-        # Adjust font size based on name length
-        if(len(first_name) >= 8 or len(last_name) >= 8):
-            longest_name = first_name if(len(first_name) > len(last_name)) else last_name 
-            oversize = len(longest_name) - 8
-            font_size = 128 - 12.32381 * oversize + 0.552381 * oversize ** 2
-            print(f"Adjusted font size to {font_size} due to name length")
-        
-        # Check for the font, use default if not available
-        try:
-            font = ImageFont.truetype(font='./font/Dia-Black.ttf', size=int(font_size))
-        except:
-            # Use default font if the specified one is not available
-            try:
-                # Try to find a system font
-                default_font = None
-                if os.path.exists('/Library/Fonts/Arial.ttf'):  # macOS
-                    default_font = '/Library/Fonts/Arial.ttf'
-                elif os.path.exists('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'):  # Linux
-                    default_font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-                elif os.path.exists('C:\\Windows\\Fonts\\Arial.ttf'):  # Windows
-                    default_font = 'C:\\Windows\\Fonts\\Arial.ttf'
-                
-                if default_font:
-                    font = ImageFont.truetype(font=default_font, size=int(font_size))
-                else:
-                    # If no system font found, use default PIL font
-                    font = ImageFont.load_default()
-            except:
-                # Fallback to default PIL font
-                font = ImageFont.load_default()
-        
-        # We'll rotate the text 90 degrees to match the landscape orientation
-        # This approach creates the text in the correct rotation for the label printer
-        # First, create a text-only image for first name
-        first_bbox = draw.textbbox((0, 0), first_name, font=font)
-        first_width = first_bbox[2] - first_bbox[0]
-        first_height = first_bbox[3] - first_bbox[1]
-        
-        # Center text horizontally
-        # For landscape orientation, we're centering along the long edge of the label (height)
-        first_x = (height - first_width) / 2
-        
-        # Position first name in the top third of the image
-        first_y = width / 4 - first_height / 2
-        
-        # Same for last name
-        last_bbox = draw.textbbox((0, 0), last_name, font=font)
-        last_width = last_bbox[2] - last_bbox[0]
-        last_height = last_bbox[3] - last_bbox[1]
-        
-        last_x = (height - last_width) / 2
-        last_y = 3 * width / 4 - last_height / 2
-        
-        # Rotate the image 90 degrees for landscape orientation
-        # We need to transpose the coordinates for the rotated image
-        # In a landscape-rotated image, (0,0) is at the top-right corner
-        
-        # Draw the text on the image
-        # For a rotated image in PILLOW:
-        # - first_x becomes y value counting from top
-        # - first_y becomes x value counting from right to left
-        
-        # Rotate the entire canvas 90 degrees counter-clockwise
-        rotated_image = image.rotate(90, expand=True)
-        rotated_draw = ImageDraw.Draw(rotated_image)
-        
-        # Now draw the text in the rotated canvas
-        rotated_draw.text((first_y, first_x), first_name, fill="black", font=font)
-        rotated_draw.text((last_y, last_x), last_name, fill="black", font=font)
-        
-        # Create path without whitespaces
-        os.makedirs("./img", exist_ok=True)
-        path = re.sub(r'\s+', '', f"./img/{first_name}{last_name}.png")
-        
-        # Save the rotated image
-        rotated_image.save(path)
-        
-        # Print using our dynamically loaded module
-        print_success = print_module.print_name(path)
-        
-        if print_success:
-            return jsonify({"message": "Print successful", "data": {"first_name": first_name, "last_name": last_name}}), 200
-        else:
-            return jsonify({"message": "Print failed, but image saved", "data": {"first_name": first_name, "last_name": last_name, "image_path": path}}), 202
-    
+        return jsonify({
+            "message": "Print initiated",
+            "data": {
+                "first_name": first_name,
+                "last_name": last_name,
+                "image_path": image_path
+            }
+        }), 200
+
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
