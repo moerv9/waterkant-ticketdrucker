@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Name Tag Printer</title>
+    <title>Simple Label Printer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
             padding: 20px;
+        }
+        h1 {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
         }
         .form-group {
             margin-bottom: 15px;
@@ -19,7 +24,7 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
-        input, button {
+        input, select, button {
             padding: 8px;
             font-size: 16px;
         }
@@ -28,18 +33,23 @@
             color: white;
             border: none;
             cursor: pointer;
+            padding: 10px 15px;
+            margin-right: 10px;
         }
         .preview {
             margin-top: 20px;
-            border: 1px solid #ddd;
             padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
         }
-        .preview-image {
+        #previewLabel {
             margin-top: 10px;
-            max-width: 100%;
-            border: 1px dashed #999;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 5px;
+            display: inline-block;
         }
-        .response {
+        #result {
             margin-top: 20px;
             padding: 10px;
             background-color: #f0f0f0;
@@ -49,7 +59,7 @@
     </style>
 </head>
 <body>
-    <h1>Name Tag Printer Testing Interface</h1>
+    <h1>Simple Label Printer</h1>
     
     <div class="form-group">
         <label for="firstName">First Name:</label>
@@ -61,105 +71,84 @@
         <input type="text" id="lastName" value="123">
     </div>
     
-    <h3>Advanced Settings</h3>
-    
     <div class="form-group">
-        <label for="width">Image Width (px):</label>
-        <input type="number" id="width" value="696">
+        <label for="layout">Layout:</label>
+        <select id="layout">
+            <option value="side_by_side">Side by Side</option>
+            <option value="stacked">Stacked</option>
+        </select>
     </div>
     
     <div class="form-group">
-        <label for="height">Image Height (px):</label>
-        <input type="number" id="height" value="271">
+        <label for="maxFontSize">Maximum Font Size:</label>
+        <input type="number" id="maxFontSize" value="100">
     </div>
     
-    <div class="form-group">
-        <label for="firstFontSize">First Name Font Size (leave blank for auto):</label>
-        <input type="number" id="firstFontSize" placeholder="Auto">
-    </div>
-    
-    <div class="form-group">
-        <label for="lastFontSize">Last Name Font Size (leave blank for auto):</label>
-        <input type="number" id="lastFontSize" placeholder="Auto">
-    </div>
-    
-    <div class="form-group">
-        <label for="verticalSpacing">Vertical Spacing (px):</label>
-        <input type="number" id="verticalSpacing" value="10">
-    </div>
-    
-    <button onclick="printNameTag()">Print Name Tag</button>
-    <button onclick="previewOnly()">Preview Only (No Print)</button>
+    <button onclick="printLabel()">Print Label</button>
+    <button onclick="showPreview()">Preview</button>
     
     <div class="preview" id="preview" style="display: none;">
         <h3>Preview:</h3>
-        <div id="previewContent"></div>
-        <img id="previewImage" class="preview-image">
+        <div id="previewLabel"></div>
     </div>
     
-    <div class="response" id="response" style="display: none;"></div>
+    <div id="result" style="display: none;"></div>
     
     <script>
         // Base URL for API
         const apiUrl = 'http://localhost:5555';
         
-        // Preview the name tag without printing
-        async function previewOnly() {
-            const preview = document.getElementById('preview');
-            const previewContent = document.getElementById('previewContent');
-            const previewImage = document.getElementById('previewImage');
-            
-            // Get form values
+        // Show a preview
+        function showPreview() {
             const firstName = document.getElementById('firstName').value;
             const lastName = document.getElementById('lastName').value;
+            const layout = document.getElementById('layout').value;
             
-            // Set preview content
-            previewContent.innerHTML = `
-                <p><strong>First Name:</strong> ${firstName}</p>
-                <p><strong>Last Name:</strong> ${lastName}</p>
-                <p>This is a simulation only. The actual printed tag may appear different.</p>
-            `;
+            const preview = document.getElementById('preview');
+            const previewLabel = document.getElementById('previewLabel');
             
-            // Show the preview
+            // Set dimensions based on actual label size (62mm x 10mm)
+            const labelWidth = 310; // Scaled down for display
+            const labelHeight = 50;  // Scaled down for display
+            
+            previewLabel.style.width = labelWidth + 'px';
+            previewLabel.style.height = labelHeight + 'px';
+            
+            // Create preview content based on layout
+            if (layout === 'side_by_side') {
+                previewLabel.innerHTML = `<div style="font-family: Arial; font-weight: bold; font-size: 24px; text-align: center;">${firstName} ${lastName}</div>`;
+            } else {
+                previewLabel.innerHTML = `
+                    <div style="font-family: Arial; font-weight: bold; font-size: 20px; text-align: center;">${firstName}</div>
+                    <div style="font-family: Arial; font-weight: bold; font-size: 16px; text-align: center;">${lastName}</div>
+                `;
+            }
+            
             preview.style.display = 'block';
-            
-            // Simulate image (in a real app, you might generate a preview image)
-            previewImage.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="696" height="271" style="background:white;"><text x="50%" y="40%" text-anchor="middle" font-family="Arial" font-size="48" font-weight="bold">${firstName}</text><text x="50%" y="70%" text-anchor="middle" font-family="Arial" font-size="48" font-weight="bold">${lastName}</text></svg>`;
         }
         
-        // Print the name tag
-        async function printNameTag() {
-            const responseDiv = document.getElementById('response');
+        // Print the label
+        async function printLabel() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'none';
             
             try {
-                // Get form values
                 const firstName = document.getElementById('firstName').value;
                 const lastName = document.getElementById('lastName').value;
-                const width = parseInt(document.getElementById('width').value) || 696;
-                const height = parseInt(document.getElementById('height').value) || 271;
-                const firstFontSize = document.getElementById('firstFontSize').value 
-                    ? parseInt(document.getElementById('firstFontSize').value) 
-                    : null;
-                const lastFontSize = document.getElementById('lastFontSize').value 
-                    ? parseInt(document.getElementById('lastFontSize').value) 
-                    : null;
-                const verticalSpacing = parseInt(document.getElementById('verticalSpacing').value) || 10;
+                const layout = document.getElementById('layout').value;
+                const maxFontSize = parseInt(document.getElementById('maxFontSize').value) || 100;
                 
                 // Prepare request data
                 const data = {
-                    attendee_firstname: firstName,
-                    attendee_lastname: lastName,
-                    width: width,
-                    height: height,
-                    vertical_spacing: verticalSpacing
+                    first_name: firstName,
+                    last_name: lastName,
+                    layout: layout,
+                    max_font_size: maxFontSize,
+                    // Use defaults for width and height (731x118 for 62mm x 10mm at 300dpi)
                 };
                 
-                // Add optional parameters only if they have values
-                if (firstFontSize) data.first_font_size = firstFontSize;
-                if (lastFontSize) data.last_font_size = lastFontSize;
-                
-                // Send API request
-                const response = await fetch(`${apiUrl}/print-name`, {
+                // Call the API
+                const response = await fetch(`${apiUrl}/print-label`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -167,19 +156,18 @@
                     body: JSON.stringify(data)
                 });
                 
-                // Parse response
                 const result = await response.json();
                 
-                // Show response
-                responseDiv.textContent = JSON.stringify(result, null, 2);
-                responseDiv.style.display = 'block';
+                // Show the result
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+                resultDiv.style.display = 'block';
                 
-                // Also show preview
-                previewOnly();
+                // Show preview
+                showPreview();
                 
             } catch (error) {
-                responseDiv.textContent = `Error: ${error.message}`;
-                responseDiv.style.display = 'block';
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.style.display = 'block';
             }
         }
     </script>

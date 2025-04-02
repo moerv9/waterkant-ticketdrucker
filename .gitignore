@@ -176,3 +176,12 @@ cython_debug/
 
 */__pycache__/*
 printer_state.json
+printer_manager/__pycache__/__init__.cpython-311.pyc
+printer_manager/__pycache__/connection.cpython-311.pyc
+printer_manager/__pycache__/print_module.cpython-311.pyc
+printer_manager/__pycache__/scanner.cpython-311.pyc
+__pycache__
+printer_manager/__pycache__/
+printer_manager/__pycache__/*
+img/*
+img/Test123.png
