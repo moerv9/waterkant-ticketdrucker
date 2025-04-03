@@ -3,7 +3,6 @@ from flask_cors import CORS
 import os
 import time
 from functions import (
-    create_dynamic_label,
     create_simple_label,
     print_name,
     load_printer_state,
@@ -115,77 +114,6 @@ def test():
     return render_template("test.html")
 
 
-@app.route("/dynamic-test")
-def dynamic_test():
-    return render_template("dynamic_test.html")
-
-
-@app.route("/fixed-width-test")
-def fixed_width_test():
-    return render_template("fixed_width_test.html")
-
-
-@app.route("/print-dynamic", methods=["POST"])
-def handle_print_dynamic():
-    try:
-        global printer_state
-        data = request.get_json()
-
-        # Required parameters
-        if "first_name" not in data or "last_name" not in data:
-            return jsonify({"error": "Missing first or last name in request body"}), 400
-
-        first_name = data["first_name"]
-        last_name = data["last_name"]
-
-        # Optional parameters with defaults
-        layout = data.get("layout", "side_by_side")  # 'side_by_side' or 'stacked'
-        font_size = data.get("font_size", 100)
-        padding = data.get("padding", 10)
-
-        # Print debug info
-        print(f"Creating dynamic label for: {first_name} {last_name}")
-        print(f"Layout: {layout}, Font size: {font_size}, Padding: {padding}")
-        print(f"Using printer: {printer_state.get('address', 'Not connected')}")
-
-        # Create the label with dynamic sizing
-        image_path, dimensions = create_dynamic_label(
-            first_name, last_name, layout=layout, font_size=font_size, padding=padding
-        )
-
-        # Print the image - pass the printer address from the global state
-        printer_address = (
-            printer_state.get("address")
-            if printer_state.get("connected", False)
-            else None
-        )
-        print_success = print_name(image_path, printer_address)
-
-        return (
-            jsonify(
-                {
-                    "message": "Print initiated",
-                    "success": print_success,
-                    "printer": printer_address,
-                    "data": {
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "image_path": image_path,
-                        "layout": layout,
-                        "font_size": font_size,
-                        "width": dimensions[0],
-                        "height": dimensions[1],
-                    },
-                }
-            ),
-            200,
-        )
-
-    except Exception as e:
-        print(f"Error in print-dynamic endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route("/print-simple", methods=["POST"])
 def handle_print_simple():
     try:
@@ -254,61 +182,6 @@ def handle_print_simple():
         return jsonify({"error": str(e)}), 500
 
 
-# Maintain the old endpoints for backward compatibility
-@app.route("/print-name", methods=["POST"])
-def handle_print_name():
-    try:
-        global printer_state
-        data = request.get_json()
-
-        # Required parameters
-        if "attendee_firstname" not in data or "attendee_lastname" not in data:
-            return jsonify({"error": "Missing first or last name in request body"}), 400
-
-        first_name = data["attendee_firstname"]
-        last_name = data["attendee_lastname"]
-
-        # Use font size if provided, otherwise default to 400 which worked well
-        font_size = data.get("font_size", 400)
-
-        # Create dynamic label
-        image_path, dimensions = create_dynamic_label(
-            first_name,
-            last_name,
-            layout=data.get("layout", "side_by_side"),
-            font_size=font_size,
-            padding=data.get("padding", 10),
-        )
-
-        # Print the image - pass the printer address from the global state
-        printer_address = (
-            printer_state.get("address")
-            if printer_state.get("connected", False)
-            else None
-        )
-        print_success = print_name(image_path, printer_address)
-
-        return (
-            jsonify(
-                {
-                    "message": "Print initiated",
-                    "success": print_success,
-                    "printer": printer_address,
-                    "data": {
-                        "first_name": first_name,
-                        "last_name": last_name,
-                        "image_path": image_path,
-                        "width": dimensions[0],
-                        "height": dimensions[1],
-                    },
-                }
-            ),
-            200,
-        )
-
-    except Exception as e:
-        print(f"Error in print-name endpoint: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
